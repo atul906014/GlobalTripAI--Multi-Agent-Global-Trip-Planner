@@ -1,5 +1,35 @@
-let currentThreadId = localStorage.getItem("travel_thread_id") || null;
+let activeMode = localStorage.getItem("chat_mode") === "general" ? "general" : "trip";
+let currentThreadId = null;
 let latestAnswerMarkdown = "";
+
+function setMode(mode) {
+    activeMode = mode;
+    const isTripMode = mode === "trip";
+    const threadKey = isTripMode ? "travel_thread_id" : "chat_thread_id";
+    currentThreadId = localStorage.getItem(threadKey) || null;
+
+    document.querySelectorAll(".mode-switch button").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+    });
+
+    document.getElementById("promptTitle").textContent = isTripMode
+        ? "Where do you want to go?"
+        : "What would you like to chat about?";
+    document.getElementById("promptDescription").textContent = isTripMode
+        ? "Example: Plan a complete 7 days trip from Bangalore to Sikkim."
+        : "Ask a question or continue your conversation.";
+    document.getElementById("userInput").placeholder = isTripMode
+        ? "Plan a complete 7 days Sikkim trip including flights, hotels and sightseeing under 2 lakhs..."
+        : "Ask me anything...";
+    document.getElementById("btnText").textContent = isTripMode ? "Generate Plan" : "Send Message";
+    document.querySelector(".quick-prompts").classList.toggle("hidden", !isTripMode);
+    document.querySelector(".download-btn").classList.toggle("hidden", !isTripMode);
+    document.getElementById("resultTitle").textContent = isTripMode
+        ? "Your AI Travel Plan"
+        : "Assistant Response";
+
+    localStorage.setItem("chat_mode", mode);
+}
 
 function setPrompt(text) {
     document.getElementById("userInput").value = text;
@@ -58,6 +88,80 @@ function showResult(answer, threadId) {
     });
 }
 
+function showApprovalSection(text, threadId) {
+    const approvalSection = document.getElementById("approvalSection");
+    const approvalText = document.getElementById("approvalRequestText");
+    const approvalTextarea = document.getElementById("approvalFeedback");
+
+    if (!approvalSection) {
+        return;
+    }
+
+    approvalText.textContent = text || "Please review the generated draft itinerary.";
+    approvalTextarea.value = "";
+    approvalSection.classList.remove("hidden");
+    currentThreadId = threadId || currentThreadId;
+}
+
+function hideApprovalSection() {
+    const approvalSection = document.getElementById("approvalSection");
+    if (approvalSection) {
+        approvalSection.classList.add("hidden");
+    }
+    const approvalTextarea = document.getElementById("approvalFeedback");
+    if (approvalTextarea) {
+        approvalTextarea.value = "";
+    }
+}
+
+async function submitApproval(approved) {
+    const approvalTextarea = document.getElementById("approvalFeedback");
+    const feedback = approvalTextarea ? approvalTextarea.value.trim() : "";
+
+    if (!currentThreadId) {
+        showError("No thread is active for approval.");
+        return;
+    }
+
+    if (!approved && !feedback) {
+        showError("Please provide revision feedback when requesting changes.");
+        return;
+    }
+
+    setLoading(true);
+
+    try {
+        const response = await fetch("/api/travel/approve", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                thread_id: currentThreadId,
+                approved,
+                feedback
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Could not submit your approval decision.");
+        }
+
+        hideApprovalSection();
+        showResult(data.answer, data.thread_id);
+        if (data.requires_approval) {
+            showApprovalSection(data.approval_request || "Please review the generated draft itinerary.", data.thread_id);
+        }
+
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        setLoading(false);
+    }
+}
+
 async function sendMessage() {
     hideError();
 
@@ -65,14 +169,16 @@ async function sendMessage() {
     const message = input.value.trim();
 
     if (!message) {
-        showError("Please enter your travel request first.");
+        showError("Please enter a message first.");
         return;
     }
 
     setLoading(true);
 
     try {
-        const response = await fetch("/api/travel", {
+        const isTripMode = activeMode === "trip";
+        const threadKey = isTripMode ? "travel_thread_id" : "chat_thread_id";
+        const response = await fetch(isTripMode ? "/api/travel" : "/api/chat", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -90,9 +196,15 @@ async function sendMessage() {
         }
 
         currentThreadId = data.thread_id;
-        localStorage.setItem("travel_thread_id", currentThreadId);
+        localStorage.setItem(threadKey, currentThreadId);
 
         showResult(data.answer, data.thread_id);
+
+        if (isTripMode && data.requires_approval) {
+            showApprovalSection(data.approval_request || "Please review the generated draft itinerary.", data.thread_id);
+        } else {
+            hideApprovalSection();
+        }
 
     } catch (error) {
         showError(error.message);
@@ -181,3 +293,13 @@ document.addEventListener("keydown", function(event) {
         sendMessage();
     }
 });
+
+document.getElementById("approveBtn")?.addEventListener("click", function() {
+    submitApproval(true);
+});
+
+document.getElementById("reviseBtn")?.addEventListener("click", function() {
+    submitApproval(false);
+});
+
+setMode(activeMode);

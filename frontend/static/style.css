@@ -159,6 +159,33 @@ body {
     align-items: stretch;
 }
 
+.mode-switch {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.5);
+}
+
+.mode-switch button {
+    min-height: 38px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #cbd5e1;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.mode-switch button[aria-pressed="true"] {
+    background: #0f766e;
+    color: #ffffff;
+}
+
 textarea {
     width: 100%;
     min-height: 150px;
@@ -378,6 +405,60 @@ textarea::placeholder {
     background: #eff6ff;
     color: #111827;
     font-weight: 800;
+}
+
+.approval-section {
+    margin-top: 18px;
+    padding: 20px;
+    border-radius: 18px;
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    background: rgba(251, 191, 36, 0.08);
+}
+
+.approval-header {
+    margin-bottom: 10px;
+}
+
+.approval-header h3 {
+    color: #fef3c7;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+#approvalRequestText {
+    color: #fef3c7;
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+
+#approvalFeedback {
+    min-height: 90px;
+    margin-bottom: 14px;
+}
+
+.approval-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.approve-btn,
+.revise-btn {
+    border: none;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.approve-btn {
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: white;
+}
+
+.revise-btn {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    color: #111827;
 }
 
 .error-box {

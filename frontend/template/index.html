@@ -5,7 +5,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>TripMate AI</title>
+    <title>GlobalTrip AI</title>
 
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -30,7 +30,7 @@
             </h1>
 
             <p>
-                Search flights, discover hotels, and generate a complete travel itinerary using a multi-agent LangGraph system.
+                Search flights, discover hotels, and generate a complete travel itinerary using AI. Just tell us where you want to go, and we'll take care of the rest!
             </p>
         </section>
 
@@ -38,8 +38,8 @@
 
             <div class="card-header">
                 <div>
-                    <h2>Where do you want to go?</h2>
-                    <p>
+                    <h2 id="promptTitle">Where do you want to go?</h2>
+                    <p id="promptDescription">
                         Example: Plan a complete 7 days  trip from Bangalore to Sikkim.
                     </p>
                 </div>
@@ -48,6 +48,11 @@
                     <span class="status-dot"></span>
                     Online
                 </div>
+            </div>
+
+            <div class="mode-switch" role="group" aria-label="Chat mode">
+                <button type="button" data-mode="trip" aria-pressed="true" onclick="setMode('trip')">Trip Plan</button>
+                <button type="button" data-mode="general" aria-pressed="false" onclick="setMode('general')">General Chat</button>
             </div>
 
             <div class="input-area">
@@ -86,7 +91,7 @@
 
             <div class="result-header">
                 <div>
-                    <h2>Your AI Travel Plan</h2>
+                    <h2 id="resultTitle">Your AI Travel Plan</h2>
                     <p id="threadInfo">Thread ID: -</p>
                 </div>
 
@@ -106,15 +111,23 @@
                 <div id="resultBox" class="result-box"></div>
             </div>
 
+            <div id="approvalSection" class="approval-section hidden">
+                <div class="approval-header">
+                    <h3>Review draft itinerary</h3>
+                </div>
+                <p id="approvalRequestText">Please review the generated draft itinerary.</p>
+                <textarea id="approvalFeedback" placeholder="Add revision feedback (optional if you approve)"></textarea>
+                <div class="approval-actions">
+                    <button id="approveBtn" class="approve-btn" type="button">Approve</button>
+                    <button id="reviseBtn" class="revise-btn" type="button">Request Changes</button>
+                </div>
+            </div>
+
         </section>
 
         <section id="errorBox" class="error-box hidden"></section>
 
     </main>
-
-    <footer>
-        Built with FastAPI, LangGraph, Groq, PostgreSQL, Tavily and AviationStack
-    </footer>
 
     <!-- Markdown Renderer -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
