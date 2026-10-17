@@ -18,30 +18,36 @@ def fetch_latest_news(query: str, page_size: int = 20):
         "apiKey": api_key,
     }
 
-    response = requests.get(
-        url,
-        params=params,
-        timeout=10
-    )
-
-    print("Status:", response.status_code)
-    print("Request:", response.url)
-
-    response.raise_for_status()
-
-    data = response.json()
-
-    print("API status:", data.get("status"))
-    print("Total results:", data.get("totalResults"))
-    print("Error:", data.get("code"), data.get("message"))
-
-    if data.get("status") != "ok":
-        raise RuntimeError(
-            data.get("message", "NewsAPI request failed")
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
         )
 
-    articles = data.get("articles", [])
+        print("Status:", response.status_code)
+        print("Request:", response.url)
 
-    print("Fetched:", len(articles))
+        response.raise_for_status()
 
-    return articles
+        data = response.json()
+
+        print("API status:", data.get("status"))
+        print("Total results:", data.get("totalResults"))
+        print("Error:", data.get("code"), data.get("message"))
+
+        if data.get("status") != "ok":
+            raise RuntimeError(
+                data.get("message", "NewsAPI request failed")
+            )
+
+        articles = data.get("articles", [])
+
+        print("Fetched:", len(articles))
+
+        return articles
+
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError(
+            f"Failed to fetch news from NewsAPI: {exc}"
+        ) from exc
