@@ -25,7 +25,7 @@ from langchain.agents import create_agent
 from langchain_groq import ChatGroq
 from tools.tavily_tool import tavily_search
 from tools.flight_tool import search_flights
-from tools.news_tool import fetch_latest_news, get_current_date
+from tools.news_tool import fetch_latest_news, get_current_date, get_current_weather
 import logging
 logger = logging.getLogger(__name__)
 
@@ -695,7 +695,7 @@ def general_chat_agent(state: ChatState):
     
     agent = create_agent(
     model=llm,
-    tools=[fetch_latest_news, get_current_date],
+    tools=[fetch_latest_news, get_current_date, get_current_weather],
     system_prompt="You are a helpful assistant that can answer questions and provide information. You have access to a news tool to fetch the latest news articles based on user queries.",
 )
 
