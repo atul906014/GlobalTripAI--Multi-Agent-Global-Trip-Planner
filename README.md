@@ -1,4 +1,14 @@
-1.# GlobalTrip AI
+1.---
+title: GlobalTrip AI
+emoji: ✈️
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# GlobalTrip AI
 
 GlobalTrip AI is a travel-planning web application powered by a multi-agent workflow. It helps users plan trips by combining flight research, hotel suggestions, budget analysis, and itinerary generation into a single guided experience.
 
@@ -44,9 +54,9 @@ GlobalTripAI--Multi-Agent-Global-Trip-Planner/
 │   │   └── style.css
 │   └── template/
 │       └── index.html
-├── Readme.md
-├── readme.md
-└── .env.example (if added later)
+├── Dockerfile
+├── README.md
+└── .dockerignore
 ```
 
 ## Prerequisites
@@ -54,7 +64,7 @@ GlobalTripAI--Multi-Agent-Global-Trip-Planner/
 Before running the app, make sure you have:
 
 - Python installed
-- A PostgreSQL database URL available
+- An optional PostgreSQL database URL for persistent conversation state
 - A Groq API key, or a local Ollama model configuration
 - Access to the required Python packages listed in `backend/requirements.txt`
 
@@ -93,6 +103,8 @@ Create a `.env` file in the `backend/` directory with values similar to the foll
 DATABASE_URL=postgresql://username:password@host:5432/database?sslmode=require
 GROQ_API_KEY=your_groq_api_key
 MODEL=llama-3.1-70b-versatile
+TAVILY_API_KEY=your_tavily_api_key
+AVIATIONSTACK_API_KEY=your_aviationstack_api_key
 
 # Optional: use a local model instead of Groq
 # use_local_model=true
@@ -101,9 +113,25 @@ MODEL=llama-3.1-70b-versatile
 
 Notes:
 
-- `DATABASE_URL` is required for LangGraph checkpointing and session continuity.
+- `GROQ_API_KEY` and `MODEL` are required when using Groq.
+- `TAVILY_API_KEY` is needed for hotel/web search, and `AVIATIONSTACK_API_KEY` is needed for flight search.
+- `DATABASE_URL` is optional. Without it, the app uses in-memory checkpoints and conversation state is lost when the app restarts.
 - If `use_local_model=true`, the app will use the local Ollama model instead of Groq.
-- If PostgreSQL is unavailable, the app starts with in-memory checkpoints and logs a warning. Conversation state is then lost when the app stops; start PostgreSQL and restart the app to restore persistent checkpoints.
+- If PostgreSQL is configured but unavailable, the app logs a warning and uses in-memory checkpoints.
+
+## Deploy to Hugging Face Spaces
+
+This repository is configured as a Docker Space and listens on port `7860`.
+
+1. Create a new Space at [Hugging Face Spaces](https://huggingface.co/new-space) and select **Docker** as the Space SDK.
+2. Add the repository files to the Space. You can connect your GitHub repository in the Space settings or push this repository to the Space's Git remote.
+3. In **Settings → Variables and secrets**, add `GROQ_API_KEY` and `TAVILY_API_KEY` as secrets. The app requires both when it starts.
+4. Set `MODEL` as a variable to a model ID currently supported by your Groq account.
+5. Add `AVIATIONSTACK_API_KEY` as a secret to enable flight search.
+6. For conversation state to survive restarts, add `DATABASE_URL` with an externally reachable PostgreSQL connection URL. Without it, the app uses in-memory checkpoints.
+7. Wait for the Space build to finish, then open the Space URL.
+
+Do not commit API keys or database credentials to the repository. Configure them as Space secrets. A Space restart clears in-memory conversation state; use PostgreSQL if persistent session state is required.
 
 ## Running the Application
 
@@ -171,7 +199,8 @@ The frontend is served from `frontend/template/index.html` and uses JavaScript f
 
 - If the app fails to start, verify that your Python environment has all packages installed.
 - If the app raises a missing environment variable error, confirm your `.env` file includes all required keys.
-- If the database connection fails, check the `DATABASE_URL` and SSL settings.
+- If PostgreSQL connection fails, check the `DATABASE_URL` and SSL settings; the app will continue with in-memory checkpoints.
+- If hotel or flight research fails, confirm the corresponding Tavily or Aviationstack secret is configured in the Space.
 - If the model fails to initialize, confirm your Groq or Ollama configuration is valid.
 
 ## Notes

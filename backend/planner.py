@@ -101,13 +101,11 @@ class ChatState(TypedDict):
     user_query: str
 
 
-def get_database_url():
-    database_url =os.getenv("DATABASE_URL")
+def get_database_url() -> str | None:
+    database_url = os.getenv("DATABASE_URL")
 
     if not database_url:
-        raise ValueError(
-            "DATABASE_URL is missing. Please add your Render PostgreSQL External Database URL to .env"
-        )
+        return None
 
     parsed_url = urlsplit(database_url)
     query_params = parse_qs(parsed_url.query, keep_blank_values=True)
@@ -607,23 +605,30 @@ graph.add_edge("guardrail_blocked", END)
 # PostgreSQL checkpoint persistence, with an in-memory fallback for local runs.
 # =========================
 DATABASE_URL = get_database_url()
-try:
-    _conn = psycopg.connect(
-        DATABASE_URL,
-        autocommit=True,
-        row_factory=dict_row,
-        connect_timeout=5,
-    )
-except psycopg.OperationalError as exc:
+if DATABASE_URL:
+    try:
+        _conn = psycopg.connect(
+            DATABASE_URL,
+            autocommit=True,
+            row_factory=dict_row,
+            connect_timeout=5,
+        )
+    except psycopg.OperationalError as exc:
+        logger.warning(
+            "PostgreSQL is unavailable (%s); using in-memory checkpoints. "
+            "Conversation state will not survive an application restart.",
+            type(exc).__name__,
+        )
+        checkpointer = InMemorySaver()
+    else:
+        checkpointer = PostgresSaver(_conn)
+        checkpointer.setup()
+else:
     logger.warning(
-        "PostgreSQL is unavailable (%s); using in-memory checkpoints. "
+        "DATABASE_URL is not configured; using in-memory checkpoints. "
         "Conversation state will not survive an application restart.",
-        type(exc).__name__,
     )
     checkpointer = InMemorySaver()
-else:
-    checkpointer = PostgresSaver(_conn)
-    checkpointer.setup()
 
 travel_graph = graph.compile(checkpointer=checkpointer)
 
