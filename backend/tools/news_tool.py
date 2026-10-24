@@ -2,6 +2,44 @@ import os
 import requests
 from langchain_core.tools import tool
 import datetime
+from functools import lru_cache
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import time
+session = requests.Session()
+
+retry = Retry(
+    total=2,
+    backoff_factor=1,
+    status_forcelist=[500, 502, 503, 504],
+    allowed_methods=["GET"],
+)
+
+session.mount("https://", HTTPAdapter(max_retries=retry))
+
+# Cache successful geocoding results for 24 hours.
+@lru_cache(maxsize=256)
+def geocode_location(location: str):
+    response = session.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        params={
+            "name": location,
+            "count": 1,
+            "language": "en",
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    places = response.json().get("results", [])
+    return places[0] if places else None
+
+
+# Cache weather results for 10 minutes.
+_weather_cache = {}
+WEATHER_TTL = 600
+
+
 
 @tool
 def fetch_latest_news(query: str, page_size: int = 20):
@@ -61,29 +99,31 @@ def get_current_date(timezone: str = "UTC"):
     """Fetch the current date and time in given timezone. Default is UTC."""
     return datetime.datetime.now(datetime.timezone.utc).astimezone(datetime.timezone.utc).isoformat()
 
-
 @tool
 def get_current_weather(location: str) -> dict:
     """Get current weather for a city using Open-Meteo."""
-    try:
-        geo = requests.get(
-            "https://geocoding-api.open-meteo.com/v1/search",
-            params={"name": location, "count": 1, "language": "en"},
-            timeout=10,
-        )
-        geo.raise_for_status()
-        places = geo.json().get("results", [])
 
-        if not places:
+    try:
+        place = geocode_location(location.strip().lower())
+
+        if not place:
             return {"error": f"Location not found: {location}"}
 
-        place = places[0]
+        latitude = place["latitude"]
+        longitude = place["longitude"]
+        cache_key = (latitude, longitude)
+        now = time.time()
 
-        weather = requests.get(
+        cached = _weather_cache.get(cache_key)
+
+        if cached and now - cached["time"] < WEATHER_TTL:
+            return cached["data"]
+
+        response = session.get(
             "https://api.open-meteo.com/v1/forecast",
             params={
-                "latitude": place["latitude"],
-                "longitude": place["longitude"],
+                "latitude": latitude,
+                "longitude": longitude,
                 "current": (
                     "temperature_2m,relative_humidity_2m,"
                     "apparent_temperature,is_day,precipitation,"
@@ -93,15 +133,47 @@ def get_current_weather(location: str) -> dict:
             },
             timeout=10,
         )
-        weather.raise_for_status()
 
-        return {
+        if response.status_code == 429:
+            return {
+                "error": "Open-Meteo rate limit reached.",
+                "retry_after": response.headers.get("Retry-After"),
+                "message": (
+                    "Please wait before retrying. "
+                    "Do not repeatedly call the weather tool."
+                ),
+            }
+
+        response.raise_for_status()
+        data = response.json()
+
+        result = {
             "location": ", ".join(
-                filter(None, [place.get("name"), place.get("country")])
+                filter(None, [
+                    place.get("name"),
+                    place.get("country"),
+                ])
             ),
-            "current": weather.json().get("current", {}),
-            "units": weather.json().get("current_units", {}),
+            "current": data.get("current", {}),
+            "units": data.get("current_units", {}),
         }
 
+        _weather_cache[cache_key] = {
+            "time": time.time(),
+            "data": result,
+        }
+
+        return result
+
     except requests.RequestException as exc:
-        return {"error": f"Weather service unavailable: {exc}"}
+        status = (
+            exc.response.status_code
+            if exc.response is not None
+            else None
+        )
+
+        return {
+            "error": "Weather service unavailable",
+            "http_status": status,
+            "details": str(exc),
+        }
