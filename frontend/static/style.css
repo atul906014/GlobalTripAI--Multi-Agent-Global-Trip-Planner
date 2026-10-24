@@ -603,6 +603,33 @@ textarea:focus-visible {
         linear-gradient(155deg, #07131f 0%, #091723 50%, #0b1724 100%);
 }
 
+.page-bg::before,
+.page-bg::after {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-repeat: no-repeat;
+    content: "";
+    pointer-events: none;
+}
+
+.page-bg::before {
+    background-image: url("/static/beach.png");
+    background-position: left 4vw center;
+    background-size: min(47vw, 610px) auto;
+    opacity: 0.19;
+    mix-blend-mode: screen;
+    mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, 0.8) 38%, transparent 100%);
+}
+
+.page-bg::after {
+    background-image: url("/static/mountains.jpg");
+    background-position: right center;
+    background-size: min(55vw, 720px) auto;
+    opacity: 0.2;
+    mask-image: linear-gradient(to left, #000 0%, rgba(0, 0, 0, 0.65) 44%, transparent 100%);
+}
+
 .circle-1 {
     background: #135b55;
     opacity: 0.22;
@@ -1304,6 +1331,18 @@ textarea:focus-visible {
 }
 
 @media (max-width: 760px) {
+    .page-bg::before {
+        background-position: left -100px top 190px;
+        background-size: 90vw auto;
+        opacity: 0.11;
+    }
+
+    .page-bg::after {
+        background-position: right -130px bottom 12vh;
+        background-size: 100vw auto;
+        opacity: 0.13;
+    }
+
     .app-container {
         width: min(100% - 28px, 620px);
         padding-top: 16px;
