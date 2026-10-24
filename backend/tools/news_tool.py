@@ -1,7 +1,7 @@
 import os
 import requests
 from langchain_core.tools import tool
-
+import datetime
 
 @tool
 def fetch_latest_news(query: str, page_size: int = 20):
@@ -54,3 +54,9 @@ def fetch_latest_news(query: str, page_size: int = 20):
         raise RuntimeError(
             f"Failed to fetch news from NewsAPI: {exc}"
         ) from exc
+
+
+@tool
+def get_current_date(timezone: str = "UTC"):
+    """Fetch the current date and time in given timezone. Default is UTC."""
+    return datetime.datetime.now(datetime.timezone.utc).astimezone(datetime.timezone.utc).isoformat()
