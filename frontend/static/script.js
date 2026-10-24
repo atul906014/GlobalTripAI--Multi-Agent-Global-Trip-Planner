@@ -64,7 +64,10 @@ function setMode(mode) {
     document.getElementById("btnText").textContent = isTripMode ? "Create my trip" : "Ask GlobalTrip";
     document.getElementById("tripPrompts").classList.toggle("hidden", !isTripMode);
     document.getElementById("chatPrompts").classList.toggle("hidden", isTripMode);
-    document.querySelector(".download-btn").classList.toggle("hidden", !isTripMode);
+    const downloadButton = document.querySelector(".download-btn");
+    if (downloadButton) {
+        downloadButton.classList.toggle("hidden", !isTripMode);
+    }
     document.getElementById("resultTitle").textContent = isTripMode
         ? "Your trip, taking shape"
         : "Your travel conversation";
@@ -108,7 +111,7 @@ function setLoading(isLoading) {
         btnLoader.classList.add("hidden");
     }
 
-    document.querySelector(".send-arrow").classList.toggle("hidden", isLoading);
+    sendBtn.querySelector(".send-arrow")?.classList.toggle("hidden", isLoading);
 }
 
 function showError(message) {
@@ -142,7 +145,6 @@ function renderConversation() {
     const resultSection = document.getElementById("resultSection");
     const threadInfo = document.getElementById("threadInfo");
     const resultBox = document.getElementById("resultBox");
-    const pdfContent = document.getElementById("pdfContent");
 
     conversationList.replaceChildren();
     resultSection.classList.toggle("hidden", conversationHistory.length === 0);
@@ -154,7 +156,7 @@ function renderConversation() {
         ? conversationHistory[lastAssistantIndex]
         : null;
     latestAnswerMarkdown = lastAssistantMessage ? lastAssistantMessage.content : "";
-    pdfContent.classList.toggle("hidden", !lastAssistantMessage);
+    resultBox.innerHTML = "";
     renderMarkdown(resultBox, latestAnswerMarkdown);
 
     conversationHistory.forEach((item, index) => {
@@ -182,17 +184,10 @@ function renderConversation() {
             label.className = "assistant-label";
             label.textContent = "GLOBALTRIP AI";
 
-            card.append(label);
-            if (index === lastAssistantIndex) {
-                pdfContent.classList.remove("hidden");
-                card.classList.add("latest-assistant-card");
-                card.append(pdfContent);
-            } else {
-                const content = document.createElement("div");
-                content.className = "assistant-message-content";
-                renderMarkdown(content, item.content);
-                card.append(content);
-            }
+            const content = document.createElement("div");
+            content.className = "assistant-message-content";
+            renderMarkdown(content, item.content);
+            card.append(label, content);
             message.append(avatar, card);
         }
 
@@ -360,7 +355,7 @@ async function copyResult() {
     }
 }
 
-function downloadPDF() {
+async function downloadPDF() {
     const pdfContent = document.getElementById("pdfContent");
     if (!latestAnswerMarkdown || activeMode !== "trip") {
         showError("Create a trip plan before downloading it.");
@@ -375,27 +370,27 @@ function downloadPDF() {
     const oldText = downloadButton.textContent;
     downloadButton.textContent = "Preparing PDF...";
     downloadButton.disabled = true;
+    pdfContent.classList.remove("hidden");
 
-    html2pdf()
-        .set({
-            margin: 0.5,
-            filename: "globaltrip-ai-travel-plan.pdf",
-            image: { type: "jpeg", quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
-            jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-            pagebreak: { mode: ["avoid-all", "css", "legacy"] }
-        })
-        .from(pdfContent)
-        .save()
-        .then(() => {
-            downloadButton.textContent = oldText;
-            downloadButton.disabled = false;
-        })
-        .catch(() => {
-            downloadButton.textContent = oldText;
-            downloadButton.disabled = false;
-            showError("Could not download the PDF. Please try again.");
-        });
+    try {
+        await html2pdf()
+            .set({
+                margin: 0.5,
+                filename: "globaltrip-ai-travel-plan.pdf",
+                image: { type: "jpeg", quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+                jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+                pagebreak: { mode: ["avoid-all", "css", "legacy"] }
+            })
+            .from(pdfContent)
+            .save();
+    } catch (error) {
+        showError("Could not download the PDF. Please try again.");
+    } finally {
+        pdfContent.classList.add("hidden");
+        downloadButton.textContent = oldText;
+        downloadButton.disabled = false;
+    }
 }
 
 document.querySelectorAll("[data-prompt]").forEach((button) => {
