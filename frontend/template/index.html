@@ -2,141 +2,147 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>GlobalTrip AI</title>
-
+    <meta name="theme-color" content="#07131f">
+    <meta name="description" content="Plan thoughtful trips and get travel answers with GlobalTrip AI.">
+    <title>GlobalTrip AI — Your travel companion</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-
 <body>
-
-    <div class="page-bg">
+    <div class="page-bg" aria-hidden="true">
         <div class="gradient-circle circle-1"></div>
         <div class="gradient-circle circle-2"></div>
         <div class="gradient-circle circle-3"></div>
     </div>
 
     <main class="app-container">
+        <header class="app-bar">
+            <a class="brand" href="/" aria-label="GlobalTrip AI home">
+                <span class="brand-mark" aria-hidden="true">G</span>
+                <span>globaltrip<span class="brand-accent">.ai</span></span>
+            </a>
+            <div class="status-pill">
+                <span class="status-dot"></span>
+                Ready when you are
+            </div>
+        </header>
 
         <section class="hero-section">
-            <div class="badge">
-                ✈️ GlobalTrip AI — Travel Planner
-            </div>
-
-            <h1>
-                Plan Your Perfect Trip with AI
-            </h1>
-
-            <p>
-                Search flights, discover hotels, and generate a complete travel itinerary using AI. Just tell us where you want to go, and we'll take care of the rest!
-            </p>
+            <div class="eyebrow"><span aria-hidden="true">✦</span> YOUR NEXT CHAPTER STARTS HERE</div>
+            <h1 id="heroTitle">Big plans. <span>Better journeys.</span></h1>
+            <p id="heroDescription">From the first flight to the last sunset, bring your travel ideas and we’ll help make them happen.</p>
         </section>
 
         <section class="planner-card">
-
             <div class="card-header">
-                <div>
-                    <h2 id="promptTitle">Where do you want to go?</h2>
-                    <p id="promptDescription">
-                        Example: Plan a complete 7 days  trip from Bangalore to Sikkim.
-                    </p>
-                </div>
-
-                <div class="status-pill">
-                    <span class="status-dot"></span>
-                    Online
+                <div class="mode-intro">
+                    <h2 id="promptTitle">Let’s plan somewhere wonderful</h2>
+                    <p id="promptDescription">Share your destination, dates, budget, and what you love doing.</p>
                 </div>
             </div>
 
-            <div class="mode-switch" role="group" aria-label="Chat mode">
-                <button type="button" data-mode="trip" aria-pressed="true" onclick="setMode('trip')">Trip Plan</button>
-                <button type="button" data-mode="general" aria-pressed="false" onclick="setMode('general')">General Chat</button>
+            <div class="mode-switch" role="group" aria-label="Choose a mode">
+                <button type="button" data-mode="trip" aria-pressed="true" onclick="setMode('trip')">
+                    <span class="mode-icon" aria-hidden="true">✈</span>
+                    <span class="mode-copy"><strong>Plan a trip</strong><small>Build your itinerary</small></span>
+                </button>
+                <button type="button" data-mode="general" aria-pressed="false" onclick="setMode('general')">
+                    <span class="mode-icon" aria-hidden="true">✳</span>
+                    <span class="mode-copy"><strong>Ask anything</strong><small>Get travel advice</small></span>
+                </button>
             </div>
 
-            <div class="input-area">
+            <div id="tripPrompts" class="quick-prompts prompt-cards" aria-label="Trip ideas">
+                <span class="prompt-label">A little inspiration</span>
+                <button type="button" data-prompt="Plan a 5-day trip from Bangalore to Sikkim with flights, comfortable hotels, sightseeing, and an estimated budget.">
+                    <span aria-hidden="true">🏔️</span><span><strong>Mountain escape</strong><small>5 days · Sikkim</small></span>
+                </button>
+                <button type="button" data-prompt="Plan a relaxing 7-day beach trip to Bali with hotel suggestions, activities, and a day-by-day itinerary.">
+                    <span aria-hidden="true">🌊</span><span><strong>Island slow-down</strong><small>7 days · Bali</small></span>
+                </button>
+                <button type="button" data-prompt="Plan a 4-day food and culture trip to Tokyo with neighborhood suggestions, local experiences, and a practical itinerary.">
+                    <span aria-hidden="true">🏙️</span><span><strong>City &amp; culture</strong><small>4 days · Tokyo</small></span>
+                </button>
+            </div>
+            <div id="chatPrompts" class="quick-prompts prompt-cards hidden" aria-label="Travel questions">
+                <span class="prompt-label">Try asking</span>
+                <button type="button" data-prompt="What should I pack for a week in Japan in spring?">
+                    <span aria-hidden="true">🧳</span><span><strong>Packing tips</strong><small>Be ready for the weather</small></span>
+                </button>
+                <button type="button" data-prompt="What are some practical ways to find affordable flights for an international trip?">
+                    <span aria-hidden="true">✈️</span><span><strong>Flight advice</strong><small>Travel smarter for less</small></span>
+                </button>
+                <button type="button" data-prompt="How can I spend a thoughtful weekend in Kyoto?">
+                    <span aria-hidden="true">🍜</span><span><strong>Local inspiration</strong><small>Find your kind of trip</small></span>
+                </button>
+            </div>
+
+            <div class="composer">
+                <label class="sr-only" for="userInput">Your travel request</label>
                 <textarea
                     id="userInput"
-                    placeholder="Plan a complete 7 days Sikkim trip including flights, hotels and sightseeing under 2 lakhs..."
+                    rows="3"
+                    maxlength="2000"
+                    placeholder="Tell us where you’d like to go, for how long, and what matters most..."
                 ></textarea>
-
-                <button id="sendBtn" onclick="sendMessage()">
-                    <span id="btnText">Generate Plan</span>
-                    <span id="btnLoader" class="loader hidden"></span>
-                </button>
+                <div class="composer-footer">
+                    <span class="composer-hint"><span aria-hidden="true">↵</span> Press Enter to send <span class="hint-divider">·</span> Shift + Enter for a new line</span>
+                    <span id="characterCount" class="character-count">0 / 2000</span>
+                    <button id="sendBtn" type="button" onclick="sendMessage()">
+                        <span id="btnText">Create my trip</span>
+                        <span id="btnLoader" class="loader hidden"></span>
+                        <span class="send-arrow" aria-hidden="true">↗</span>
+                    </button>
+                </div>
             </div>
 
-            <div class="quick-prompts">
-                <button onclick="setPrompt('Plan a complete 7 days Darjeeling trip from Bangalore including flights, hotels and sightseeing under 2 lakhs.')">
-                    Darjeeling Trip
-                </button>
-
-                <button onclick="setPrompt('Plan a 5 days Sikkim trip from Bangalore with flights, hotels and sightseeing.')">
-                    Sikkim Trip
-                </button>
-
-                <button onclick="setPrompt('Plan a 7 days Himachal trip from Bangalore with budget hotels and sightseeing.')">
-                    Himachal Trip
-                </button>
-
-                <button onclick="setPrompt('Give me all country flight info.')">
-                    Global Flights
-                </button>
-            </div>
-
+            <p class="composer-note"><span aria-hidden="true">✦</span> Thoughtful ideas for more memorable journeys.</p>
         </section>
 
         <section id="resultSection" class="result-section hidden">
-
             <div class="result-header">
                 <div>
-                    <h2 id="resultTitle">Your AI Travel Plan</h2>
-                    <p id="threadInfo">Thread ID: -</p>
+                    <span class="section-kicker">YOUR CONVERSATION</span>
+                    <h2 id="resultTitle">Your trip, taking shape</h2>
+                    <p id="threadInfo">Your conversation is ready.</p>
                 </div>
-
                 <div class="result-actions">
-                    <button class="copy-btn" onclick="copyResult()">
-                        Copy
-                    </button>
-
-                    <button class="download-btn" onclick="downloadPDF()">
-                        Download PDF
-                    </button>
+                    <button class="new-chat-btn" id="newConversationBtn" type="button">＋ <span>New conversation</span></button>
+                    <button class="copy-btn" type="button" onclick="copyResult()">Copy latest</button>
+                    <button class="download-btn" type="button" onclick="downloadPDF()">Download plan</button>
                 </div>
             </div>
 
-            <div id="pdfContent" class="pdf-content">
-                <h1 class="pdf-title">AI Travel Plan</h1>
+            <div id="conversationList" class="conversation-list" aria-live="polite"></div>
+            <div id="pdfContent" class="pdf-content hidden" aria-hidden="true">
+                <h1 class="pdf-title">GlobalTrip AI — Travel Plan</h1>
                 <div id="resultBox" class="result-box"></div>
             </div>
 
             <div id="approvalSection" class="approval-section hidden">
                 <div class="approval-header">
-                    <h3>Review draft itinerary</h3>
+                    <span class="approval-icon" aria-hidden="true">✦</span>
+                    <div>
+                        <h3>Make it yours</h3>
+                        <p>Review this draft and approve it, or tell us what you’d like changed.</p>
+                    </div>
                 </div>
                 <p id="approvalRequestText">Please review the generated draft itinerary.</p>
-                <textarea id="approvalFeedback" placeholder="Add revision feedback (optional if you approve)"></textarea>
+                <label class="sr-only" for="approvalFeedback">Revision feedback</label>
+                <textarea id="approvalFeedback" placeholder="For example: more relaxed mornings, less driving, or a smaller hotel budget…"></textarea>
                 <div class="approval-actions">
-                    <button id="approveBtn" class="approve-btn" type="button">Approve</button>
-                    <button id="reviseBtn" class="revise-btn" type="button">Request Changes</button>
+                    <button id="approveBtn" class="approve-btn" type="button">Looks good — finalize</button>
+                    <button id="reviseBtn" class="revise-btn" type="button">Request a change</button>
                 </div>
             </div>
-
         </section>
 
-        <section id="errorBox" class="error-box hidden"></section>
-
+        <section id="errorBox" class="error-box hidden" role="alert"></section>
+        <footer class="app-footer">Made for curious minds and miles yet to go.</footer>
     </main>
 
-    <!-- Markdown Renderer -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-    <!-- PDF Download Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
-    <!-- Your Custom JS -->
     <script src="/static/script.js"></script>
-
 </body>
 </html>

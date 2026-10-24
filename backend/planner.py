@@ -13,6 +13,7 @@ from psycopg.rows import dict_row
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import (
     AnyMessage,
     HumanMessage,
@@ -603,16 +604,26 @@ graph.add_edge("final_agent", END)
 graph.add_edge("guardrail_blocked", END)
 
 # =========================
-# PostgreSQL Checkpointer - original persistence kept
+# PostgreSQL checkpoint persistence, with an in-memory fallback for local runs.
 # =========================
 DATABASE_URL = get_database_url()
-_conn = psycopg.connect(
-    DATABASE_URL,
-    autocommit=True,
-    row_factory=dict_row,
-)
-checkpointer = PostgresSaver(_conn)
-checkpointer.setup()
+try:
+    _conn = psycopg.connect(
+        DATABASE_URL,
+        autocommit=True,
+        row_factory=dict_row,
+        connect_timeout=5,
+    )
+except psycopg.OperationalError as exc:
+    logger.warning(
+        "PostgreSQL is unavailable (%s); using in-memory checkpoints. "
+        "Conversation state will not survive an application restart.",
+        type(exc).__name__,
+    )
+    checkpointer = InMemorySaver()
+else:
+    checkpointer = PostgresSaver(_conn)
+    checkpointer.setup()
 
 travel_graph = graph.compile(checkpointer=checkpointer)
 

@@ -87,7 +87,7 @@ pip install -r backend/requirements.txt
 
 ## Environment Variables
 
-Create a `.env` file in the project root (or in the backend folder depending on your setup) with values similar to the following:
+Create a `.env` file in the `backend/` directory with values similar to the following. The run command below starts the application from that directory so `python-dotenv` can load the file.
 
 ```env
 DATABASE_URL=postgresql://username:password@host:5432/database?sslmode=require
@@ -103,6 +103,7 @@ Notes:
 
 - `DATABASE_URL` is required for LangGraph checkpointing and session continuity.
 - If `use_local_model=true`, the app will use the local Ollama model instead of Groq.
+- If PostgreSQL is unavailable, the app starts with in-memory checkpoints and logs a warning. Conversation state is then lost when the app stops; start PostgreSQL and restart the app to restore persistent checkpoints.
 
 ## Running the Application
 
