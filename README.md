@@ -1,4 +1,4 @@
-1.---
+---
 title: GlobalTrip AI
 emoji: ✈️
 colorFrom: blue

@@ -6,7 +6,9 @@ ENV/
 env.bak/
 venv.bak/
 .git
+**/.git
 .env
 .env.*
 **/.env
 **/.env.*
+backend/GlobalTripAI/
