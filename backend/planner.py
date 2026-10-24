@@ -1,5 +1,6 @@
 import json
-import os 
+import os
+from unittest import result 
 import certifi
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from dotenv import load_dotenv
@@ -20,6 +21,7 @@ from langchain_core.messages import (
     AIMessage,
     SystemMessage,
 )
+from langchain.agents import create_agent
 from langchain_groq import ChatGroq
 from tools.tavily_tool import tavily_search
 from tools.flight_tool import search_flights
@@ -95,9 +97,7 @@ def _json_from_llm(text: str) -> dict[str, Any]:
 
 class ChatState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]
-    news_results: str
     draft_answer: str
-    needs_news: bool
     user_query: str
 
 
@@ -687,96 +687,24 @@ def _serialize_result(
 
 
 def general_chat_agent(state: ChatState):
-    prompt = """You are a helpful assistant. Answer the user's question clearly and concisely. If you don't know the answer, say so. If the user asks for current news or events, respond with [NEEDS_NEWS] followed by your best effort answer."""
-    response = llm.invoke([
-        SystemMessage(content=prompt),
-        *state["messages"],
-    ])
-    answer = str(response.content).strip()
-    marker = "[NEEDS_NEWS]"
+    
+    agent = create_agent(
+    model=llm,
+    tools=[fetch_latest_news],
+    system_prompt="You are a helpful assistant that can answer questions and provide information. You have access to a news tool to fetch the latest news articles based on user queries.",
+)
 
-    if answer.startswith(marker):
-        return {
-            "draft_answer": answer[len(marker):].strip(),
-            "needs_news": True,
-        }
-
-    return {
-        "messages": [response],
-        "draft_answer": answer,
-        "needs_news": False,
-    }
-
-
-def route_after_general_chat(state: ChatState):
-    if state.get("needs_news"):
-        return "news_agent"
-
-    query = next(
-        str(message.content).lower()
-        for message in reversed(state["messages"])
-        if isinstance(message, HumanMessage)
-    )
-    freshness_terms = (
-        "news",
-        "latest",
-        "recent",
-        "today",
-        "breaking",
-        "current events",
-        "right now",
-        "as of",
-    )
-    answer = state.get("draft_answer", "").lower().replace("’", "'")
-    unable_to_answer_terms = (
-        "don't have real-time",
-        "do not have real-time",
-        "don't have access to current",
-        "do not have access to current",
-        "can't access current",
-        "cannot access current",
-        "can't provide the latest",
-        "cannot provide the latest",
-        "my knowledge cutoff",
-    )
-
-    if any(term in query for term in freshness_terms) or any(
-        term in answer for term in unable_to_answer_terms
-    ):
-        return "news_agent"
-    return "done"
-
-
-def news_agent(state: ChatState):
-    query = state["user_query"]
-    news_results = fetch_latest_news(query)
+    result = agent.invoke({
+    "messages": [
+        {"role": "user", "content": state["user_query"] }
+    ]
+})
 
     return {
-        "news_results": news_results,
+        "draft_answer": result["messages"][-1].content,
+        "messages": result["messages"],
+        "llm_calls": state.get("llm_calls", 0) + 1
     }
-
-
-def combine_news_agent(state: ChatState):
-    query = state["user_query"]
-    previous_messages = state["messages"][:-1]
-    prompt = f"""Answer the user's question using the fetched news results and your existing knowledge.
-Reconcile these sources, do not invent current facts, and say clearly if the results do not provide enough information.
-
-User question:
-{query}
-
-Initial best-effort answer:
-{state.get('draft_answer', '') or 'No reliable initial answer was available.'}
-
-Fetched news results:
-{state.get('news_results', '')}
-"""
-    response = llm.invoke([
-        SystemMessage(content="You are a helpful assistant. Provide a clear, factual answer and distinguish sourced current information from general context."),
-        *previous_messages,
-        HumanMessage(content=prompt),
-    ])
-    return {"messages": [response]}
 
 
 def hotel_agent(state: TravelState):
@@ -794,21 +722,9 @@ def hotel_agent(state: TravelState):
 
 
 chat_graph_builder = StateGraph(ChatState)
-chat_graph_builder.add_node("news_agent", news_agent)
 chat_graph_builder.add_node("general_chat", general_chat_agent)
-chat_graph_builder.add_node("combine_news", combine_news_agent)
-
 chat_graph_builder.add_edge(START, "general_chat")
-chat_graph_builder.add_conditional_edges(
-    "general_chat",
-    route_after_general_chat,
-    {
-        "news_agent": "news_agent",
-        "done": END,
-    }
-)
-chat_graph_builder.add_edge("news_agent", "combine_news")
-chat_graph_builder.add_edge("combine_news", END)
+chat_graph_builder.add_edge("general_chat", END)
 chat_graph = chat_graph_builder.compile(checkpointer=checkpointer)
 
 
@@ -883,9 +799,7 @@ def run_general_chat(user_input: str, thread_id: str | None = None):
     result = chat_graph.invoke(
         {
             "messages": [HumanMessage(content=user_input)],
-            "news_results": "",
             "draft_answer": "",
-            "needs_news": False,
             "user_query": user_input
         },
         config={"configurable": {"thread_id": thread_id}},

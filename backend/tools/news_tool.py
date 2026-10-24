@@ -1,8 +1,11 @@
 import os
 import requests
+from langchain_core.tools import tool
 
 
+@tool
 def fetch_latest_news(query: str, page_size: int = 20):
+    """Fetch recent English news articles matching a search query."""
     api_key = os.getenv("NEWS_API_KEY")
 
     if not api_key:
