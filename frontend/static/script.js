@@ -127,16 +127,45 @@ function hideError() {
 }
 
 function appendMessage(role, content) {
-    conversationHistory.push({ role, content });
+    conversationHistory.push({ role, content: normalizeMessageContent(content) });
     conversationHistory = conversationHistory.slice(-40);
     saveHistory();
 }
 
+function normalizeMessageContent(content) {
+    if (typeof content === "string") {
+        return content;
+    }
+
+    if (Array.isArray(content)) {
+        return content
+            .map((part) => {
+                if (typeof part === "string") {
+                    return part;
+                }
+                if (part && typeof part === "object") {
+                    if (typeof part.text === "string") {
+                        return part.text;
+                    }
+                    if (typeof part.content === "string") {
+                        return part.content;
+                    }
+                }
+                return "";
+            })
+            .filter(Boolean)
+            .join("\n");
+    }
+
+    return content == null ? "" : String(content);
+}
+
 function renderMarkdown(target, markdown) {
+    const content = normalizeMessageContent(markdown);
     if (typeof marked !== "undefined") {
-        target.innerHTML = marked.parse(markdown);
+        target.innerHTML = marked.parse(content);
     } else {
-        target.textContent = markdown;
+        target.textContent = content;
     }
 }
 

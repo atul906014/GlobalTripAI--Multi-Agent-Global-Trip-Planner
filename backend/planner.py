@@ -1,6 +1,9 @@
 import json
 import os
-from unittest import result 
+import sys
+from pathlib import Path
+import asyncio
+import threading
 import certifi
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from dotenv import load_dotenv
@@ -21,18 +24,26 @@ from langchain_core.messages import (
     AIMessage,
     SystemMessage,
 )
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
 from tools.tavily_tool import tavily_search
 from tools.flight_tool import search_flights
 from tools.news_tool import fetch_latest_news, get_current_date
+from langchain_mcp_adapters.client import MultiServerMCPClient
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
-
+BASE_DIR = Path(__file__).resolve().parent
+WEATHER_SERVER_PATH = (
+    Path(__file__).resolve().parent
+    / "tools"
+    / "weather_server.py"
+)
 
 # State
 
@@ -127,34 +138,85 @@ if not groq_api_key:
 
 use_local_model = os.getenv("use_local_model", "False").lower() == "true"
 
+#async
+def run_async(coro):
+    """Run a coroutine safely from a synchronous graph node."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    # If this thread already has a running event loop,
+    # run the coroutine in a separate thread.
+    result = []
+    errors = []
+
+    def runner():
+        try:
+            result.append(asyncio.run(coro))
+        except Exception as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=runner)
+    thread.start()
+    thread.join()
+
+    if errors:
+        raise errors[0]
+
+    return result[0]
+
+
+
+
 # LLM
 def get_llm():
+    provider = os.getenv("LLM_PROVIDER", "groq").lower()
 
-    if use_local_model:
-        model = os.getenv("LOCAL_MODEL")
-        if not model:
-            raise ValueError("LOCAL_MODEL is missing. Please add it to your .env file.")
-        print("Using local model: ", model)
-        llm = ChatOllama(
-           model="qwen2.5-coder:7b",
-            temperature=0.6,
-            )
-        return llm
+    if provider == "gemini":
+        return ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            temperature=0.2,
+            max_retries=2,
+            api_key=os.getenv("GEMINI_API_KEY"),
+        )
+
+    elif provider == "ollama":
+        return ChatOllama(
+            model=os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
+            temperature=0.2,
+        )
+
     else:
-        model = os.getenv("MODEL")
-        if not model:
-            raise ValueError("MODEL is missing. Please add it to your .env file.")
         return ChatGroq(
-            model=model,
-            api_key=groq_api_key,
-            temperature=0.6,
-            max_tokens=2048,
+            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            temperature=0.2,
+            api_key=os.getenv("GROQ_API_KEY"),
         )
 
 
+def load_weather_tools():
+    """Load MCP tools synchronously during application startup."""
+    return asyncio.run(client.get_tools())
 
     
 llm=get_llm()
+client = MultiServerMCPClient({
+        "weather": {
+            "command": sys.executable,
+            "args": [str(WEATHER_SERVER_PATH)],
+            "transport": "stdio",
+        }
+    }
+)
+weather_tools = load_weather_tools()
+
+logger.info(
+    "Loaded weather MCP tools: %s",
+    [tool.name for tool in weather_tools],
+)
+
+
 
 
 # =========================
@@ -439,11 +501,21 @@ Make the itinerary practical, budget-aware, and easy to follow.
 Create a clear draft that is ready for human review.
 """
 
-    response = llm.invoke(
-        [
-            SystemMessage(content="You are an expert travel planner."),
-            HumanMessage(content=prompt),
-        ]
+
+    agent = create_agent(
+    model=llm,
+    tools=[get_current_date, *weather_tools],
+    system_prompt="You are an expert travel planner. You have access to tools to get date or weather information.Use this information to enhance the travel itinerary and provide accurate recommendations.",
+)
+
+
+    response = run_async(
+        agent.ainvoke({
+            "messages": [
+                {"role": "system", "content": "You are an expert travel planner."},
+                {"role": "user", "content": prompt}
+            ]
+        })
     )
 
     approval_request = (
@@ -452,7 +524,7 @@ Create a clear draft that is ready for human review.
     )
 
     return {
-        "itinerary": response.content,
+        "itinerary": response["messages"][-1].content,
         "approval_request": approval_request,
         "messages": [AIMessage(content="Draft itinerary created for human review.")],
         "llm_calls": state.get("llm_calls", 0) + 1,
@@ -692,18 +764,21 @@ def _serialize_result(
 
 
 def general_chat_agent(state: ChatState):
+
     
     agent = create_agent(
     model=llm,
-    tools=[fetch_latest_news, get_current_date],
-    system_prompt="You are a helpful assistant that can answer questions and provide information. You have access to a news tool to fetch the latest news articles based on user queries.",
+    tools=[fetch_latest_news, get_current_date, *weather_tools],
+    system_prompt="You are a helpful assistant that can answer questions and provide information. You have access tool to to get news or weather information.",
 )
 
-    result = agent.invoke({
-    "messages": [
-        {"role": "user", "content": state["user_query"] }
-    ]
-})
+    result = run_async(
+    agent.ainvoke({
+        "messages": [
+            {"role": "user", "content": state["user_query"]}
+        ]
+    })
+)
 
     return {
         "draft_answer": result["messages"][-1].content,

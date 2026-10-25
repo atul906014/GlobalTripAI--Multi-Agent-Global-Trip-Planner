@@ -61,3 +61,5 @@ def get_current_date(timezone: str = "UTC"):
     """Fetch the current date and time in given timezone. Default is UTC."""
     return datetime.datetime.now(datetime.timezone.utc).astimezone(datetime.timezone.utc).isoformat()
 
+
+
