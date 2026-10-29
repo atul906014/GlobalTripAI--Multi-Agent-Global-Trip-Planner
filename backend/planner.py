@@ -12,7 +12,7 @@ from typing import Any, TypedDict, Annotated
 import operator
 from langgraph.types import Command, interrupt
 import uuid
-import psycopg
+from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, START, END
@@ -197,11 +197,7 @@ def get_llm():
 
 def load_weather_tools():
     """Load MCP tools synchronously during application startup."""
-    return asyncio.run(client.get_tools())
-
-    
-llm=get_llm()
-client = MultiServerMCPClient({
+    client = MultiServerMCPClient({
         "weather": {
             "command": sys.executable,
             "args": [str(WEATHER_SERVER_PATH)],
@@ -209,13 +205,17 @@ client = MultiServerMCPClient({
         }
     }
 )
+    return asyncio.run(client.get_tools())
+
+    
+llm=get_llm()
+
 weather_tools = load_weather_tools()
 
 logger.info(
     "Loaded weather MCP tools: %s",
     [tool.name for tool in weather_tools],
 )
-
 
 
 
@@ -677,33 +677,40 @@ graph.add_edge("guardrail_blocked", END)
 # PostgreSQL checkpoint persistence, with an in-memory fallback for local runs.
 # =========================
 DATABASE_URL = get_database_url()
+checkpointer = None
+
 if DATABASE_URL:
     try:
-        _conn = psycopg.connect(
-            DATABASE_URL,
-            autocommit=True,
-            row_factory=dict_row,
-            connect_timeout=5,
+        pool = ConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=1,
+            max_size=5,
+            max_idle=240,                      # close idle conns before Neon does
+            check=ConnectionPool.check_connection,  # test conn before handing it out
+            timeout=15,                        # wait for Neon to wake up
+            kwargs={
+                "autocommit": True,            # required by PostgresSaver
+                "row_factory": dict_row,       # required by PostgresSaver
+                "prepare_threshold": 0,        # needed behind Neon's pooler (PgBouncer)
+                "connect_timeout": 15,
+            },
+            open=False,
         )
-    except psycopg.OperationalError as exc:
+        pool.open(wait=True, timeout=20)
+        checkpointer = PostgresSaver(pool)
+        checkpointer.setup()
+    except Exception as exc:
         logger.warning(
             "PostgreSQL is unavailable (%s); using in-memory checkpoints. "
             "Conversation state will not survive an application restart.",
             type(exc).__name__,
         )
-        checkpointer = InMemorySaver()
-    else:
-        checkpointer = PostgresSaver(_conn)
-        checkpointer.setup()
-else:
-    logger.warning(
-        "DATABASE_URL is not configured; using in-memory checkpoints. "
-        "Conversation state will not survive an application restart.",
-    )
+        checkpointer = None
+
+if checkpointer is None:
     checkpointer = InMemorySaver()
 
 travel_graph = graph.compile(checkpointer=checkpointer)
-
 
 # =========================
 # FastAPI-facing helpers
