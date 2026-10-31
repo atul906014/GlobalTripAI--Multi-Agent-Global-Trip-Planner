@@ -776,7 +776,7 @@ def general_chat_agent(state: ChatState):
     agent = create_agent(
     model=llm,
     tools=[fetch_latest_news, get_current_date, *weather_tools],
-    system_prompt="You are a helpful assistant that can answer questions and provide information. You have access tool to to get news or weather information.",
+    system_prompt="You are a helpful assistant that can answer questions and provide information.You have access to tools to fetch the latest news, get the current date, and retrieve weather information. Use these tools to provide accurate and up-to-date responses.",
 )
 
     result = run_async(

@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
+from model import TravelRequest, ChatRequest, ApprovalRequest
 from planner import run_general_chat, run_travel_agent, resume_travel_agent
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -26,25 +26,6 @@ app.mount(
 templates = Jinja2Templates(
     directory=str(BASE_DIR.parent / "frontend" / "template")
 )
-
-
-
-class TravelRequest(BaseModel):
-    message: str
-    thread_id: str | None = None
-
-
-class ChatRequest(BaseModel):
-    message: str
-    thread_id: str | None = None
-
-
-
-class ApprovalRequest(BaseModel):
-    thread_id: str = Field(min_length=1)
-    approved: bool
-    feedback: str =""  # Optional feedback field
-
 
 
 @app.get("/", response_class=HTMLResponse)
