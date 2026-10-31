@@ -8,8 +8,7 @@ import certifi
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from dotenv import load_dotenv
 load_dotenv()
-from typing import Any, TypedDict, Annotated
-import operator
+from typing import Any
 from langgraph.types import Command, interrupt
 import uuid
 from psycopg_pool import ConnectionPool
@@ -24,6 +23,7 @@ from langchain_core.messages import (
     AIMessage,
     SystemMessage,
 )
+from model import TravelState, ChatState
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
@@ -44,29 +44,6 @@ WEATHER_SERVER_PATH = (
     / "tools"
     / "weather_server.py"
 )
-
-# State
-
-class TravelState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]
-    user_query: str
-    flight_results: str
-    hotel_results: str
-    itinerary: str
-    llm_calls: int
-    # New budget + HITL state
-    budget_results: str
-    approval_request: str
-    approved: bool
-    human_feedback: str
-    final_response: str
-
-    # Supervisor + guardrail state
-    guardrail_allowed: bool
-    guardrail_reason: str
-    selected_agents: list[str]
-    trip_constraints: dict[str, Any]
-    supervisor_reasoning: str
 
 
 KNOWN_AGENTS = {
@@ -103,13 +80,6 @@ def _json_from_llm(text: str) -> dict[str, Any]:
         raise ValueError("The model did not return a JSON object.")
 
     return json.loads(text[start : end + 1])
-
-
-
-class ChatState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]
-    draft_answer: str
-    user_query: str
 
 
 def get_database_url() -> str | None:
